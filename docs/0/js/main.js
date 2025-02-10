@@ -228,6 +228,29 @@ window.addEventListener('DOMContentLoaded', (event) => {
             && true===t.isMale && true===t[3]
             && 65.1===t.weight && 65.1===t[4]
     });
+    a.e(TypeError, `無効な名前です。次のパターンのみ有効です。:あ:/^[a-zA-Z][a-zA-Z0-9]*$/`, ()=>Tuple.of('あ'))
+    a.e(TypeError, `存在しないキーです。:y`, ()=>{
+        const t = Tuple.of('x');
+        t.y
+    });
+    a.e(TypeError, `代入禁止です。`, ()=>{
+        const t = Tuple.of('x');
+        t.x = ''
+    });
+    a.e(TypeError, `削除禁止です。`, ()=>{
+        const t = Tuple.of('x');
+        delete t.x
+    });
+    a.e(TypeError, `プロトタイプへの代入禁止です。`, ()=>{
+        const t = Tuple.of('x');
+        Object.setPrototypeOf(t, {value:0})
+    });
+    a.t(()=>{
+        const t = Tuple.of('x');
+        const keys = [...Object.keys(t)]
+        console.log(keys, t)
+        return 1===keys.length && 'x'===keys[0]
+    })
     a.fin();
 });
 window.addEventListener('beforeunload', (event) => {

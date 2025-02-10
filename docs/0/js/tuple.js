@@ -1,7 +1,7 @@
 ;(function(){
 class Tuple {
     static #NOT_CALL_CONSTRUCTOR = 'Tupleのコンストラクタは呼出禁止です。代わりにTupe.of()またはTuple.mut()してください。'
-    static #KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9]+$/;
+    static #KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*$/;
     static of(script) {return this.#new(script)}// 'key value ...' / 'key=value ...' / 'key:type' / 'key:type=def ...'
 //    static imm(script) {return this.of(script)}
     static mut(script) {return this.#new(script,true)}// ミュータブル（値の代入ができる版。キーの追加・削除は変わらず不可）
@@ -41,8 +41,10 @@ class Tuple {
                     if (Type.hasGetter(target, key)) { return Reflect.get(target, key) } // ゲッター
                     else if ('function'===typeof target[key]) { return target[key].bind(target) } // メソッド参照
                     return target[key] // プロパティ値
+                } else {
+                    throw new TypeError(`存在しないキーです。:${key}`)
+                    this.#throwName(key);
                 }
-                this.#throwName(key);
                 /*
                 //if (key in target) {
                 console.log(target._obj)
@@ -78,11 +80,12 @@ class Tuple {
         set: (target, key, value, receiver)=>{
             //this.#throwName(key);
             //if ('_originalTarget'===key && value instanceof Namespace) {target[key]=value;return true}
-            if (['_originalTarget', '_obj'].some(v=>v===k) && value instanceof Namespace) {target[key]=value;return true}
+            if (['_originalTarget', '_obj'].some(v=>v===key) && value instanceof Namespace) {target[key]=value;return true}
             else {throw new TypeError(`代入禁止です。`)}
         },
         //ownKeys(target) {return []}, // _min, _max, _originalTarget だが、これらを隠す
-        ownKeys: (target)=>{return target._obj.map(o=>o.k)},
+        //ownKeys: (target)=>{return target._obj.map(o=>o.k)},
+        ownKeys(target){console.log(target, target._obj, target._obj.map(o=>o.k));return target._obj.map(o=>o.k)},
         deleteProperty(target, key) {throw new TypeError(`削除禁止です。`)},
         isExtensible(target) {return false}, // 新しいプロパティ追加禁止
         setPrototypeOf(target, prototype) {throw new TypeError(`プロトタイプへの代入禁止です。`)}
@@ -173,12 +176,13 @@ class Tuple {
         return textbase.StringDataType(defTxts[i])
     }
     static #define(ins, k, v, isMutable=false) {
+        this.#throwName(k);
         Object.defineProperty(ins, `${k}`, {// Protected
             value: v,
             writable: isMutable, // 値変更禁止（obj[key] = v）
             enumeratable: true,  // 列挙可（Object.keys()）
             configurable: false, // キー削除禁止（delete obj[key]）
-        })
+        });
     }
     /*
     #kvs(textValues) {
