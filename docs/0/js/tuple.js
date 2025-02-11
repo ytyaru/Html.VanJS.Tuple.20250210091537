@@ -7,10 +7,13 @@ class Tuple {
     static mut(script) {return this.#new(script,true)}// ミュータブル（値の代入ができる版。キーの追加・削除は変わらず不可）
     static #new(script, isMutable=false) {
         const ins = new Tuple(this.#NOT_CALL_CONSTRUCTOR)
-        ins._obj = this.#parse(script)
-        ins._originalTarget = ins;
+//        ins._obj = this.#parse(script)
+//        ins._originalTarget = ins;
+        this.#defineInner(ins, '_obj', this.#parse(script), isMutable);
+        this.#defineInner(ins, '_originalTarget', ins, isMutable);
+        this.#defineInner(ins, '_iterI', 0, true);
         //for (let [i,k,t,v] of ins._obj._entries){this.#define(ins, k, v, isMutable)}
-        for (let o of ins._obj){this.#define(ins, o.k, o.v, isMutable)}
+        for (let o of ins._obj){this.#defineMember(ins, o.k, o.v, isMutable)}
         return new Proxy(ins, this.#handler())
     }
     constructor(from) {
@@ -21,7 +24,9 @@ class Tuple {
         get: (target, key, receiver)=>{
             //if (Number.isInteger(key) && key < target._obj.length) {}
             //if (Number.isInteger(key)) {
-            if (/^(-)?\d+$/.test(key)) {
+                 //if (Symbol.iterator===key){return target[Symbol.iterator].bind(target);}
+                 if (Symbol.iterator===key){console.log('Symbol.iterator===key');return target[Symbol.iterator].bind(target);}
+            else if (/^(-)?\d+$/.test(key)) {
                 const i = parseInt(key);
                 const idx = i < 0 ? (target._obj.length - (key*-1)) % target._obj.length : key
                 return target._obj[idx].v;
@@ -80,12 +85,24 @@ class Tuple {
         set: (target, key, value, receiver)=>{
             //this.#throwName(key);
             //if ('_originalTarget'===key && value instanceof Namespace) {target[key]=value;return true}
-            if (['_originalTarget', '_obj'].some(v=>v===key) && value instanceof Namespace) {target[key]=value;return true}
+            if (['_originalTarget', '_obj', '_iterI'].some(v=>v===key) && value instanceof Namespace) {target[key]=value;return true}
             else {throw new TypeError(`代入禁止です。`)}
         },
         //ownKeys(target) {return []}, // _min, _max, _originalTarget だが、これらを隠す
         //ownKeys: (target)=>{return target._obj.map(o=>o.k)},
-        ownKeys(target){console.log(target, target._obj, target._obj.map(o=>o.k));return target._obj.map(o=>o.k)},
+        //ownKeys(target){console.log(target, target._obj, target._obj.map(o=>o.k));return target._obj.map(o=>o.k)},
+        /*
+        ownKeys(target){
+            console.log(target, target._obj, target._obj.map(o=>o.k));
+            //return target._obj.map(o=>o.k)
+            //for (let key of target._obj.map(o=>o.k)){yield key}
+            //return Object.getOwnPropertyNames(p)
+            return Reflect.ownKeys(target._obj)
+            // Object.getOwnPropertyNames(p)
+        },
+        */
+        //ownKeys(target){return []},
+        //ownKeys(target){return Reflect.ownKeys(target)},
         deleteProperty(target, key) {throw new TypeError(`削除禁止です。`)},
         isExtensible(target) {return false}, // 新しいプロパティ追加禁止
         setPrototypeOf(target, prototype) {throw new TypeError(`プロトタイプへの代入禁止です。`)}
@@ -175,15 +192,52 @@ class Tuple {
         }
         return textbase.StringDataType(defTxts[i])
     }
+    /*
     static #define(ins, k, v, isMutable=false) {
         this.#throwName(k);
         Object.defineProperty(ins, `${k}`, {// Protected
             value: v,
             writable: isMutable, // 値変更禁止（obj[key] = v）
-            enumeratable: true,  // 列挙可（Object.keys()）
+            //enumeratable: true,  // 列挙可（Object.keys()）
+            enumerable: true,    // 列挙可（Object.keys()）
             configurable: false, // キー削除禁止（delete obj[key]）
         });
     }
+    */
+    static #defineMember(ins, k, v, isMutable=false) {
+        this.#throwName(k);
+        this.#define(ins, k, v, true, isMutable)
+        /*
+        Object.defineProperty(ins, `${k}`, {// Protected
+            value: v,
+            writable: isMutable, // 値変更禁止（obj[key] = v）
+            //enumeratable: true,  // 列挙可（Object.keys()）
+            enumerable: true,    // 列挙可（Object.keys()）
+            configurable: false, // キー削除禁止（delete obj[key]）
+        });
+        */
+    }
+    static #defineInner(ins, k, v, isMutable=false) {
+        this.#define(ins, k, v, false, isMutable)
+        /*
+        Object.defineProperty(ins, `${k}`, {// Protected
+            value: v,
+            writable: isMutable, // 値変更禁止（obj[key] = v）
+            //enumeratable: true,  // 列挙可（Object.keys()）
+            enumerable: false,    // 列挙可（Object.keys()）
+            configurable: false, // キー削除禁止（delete obj[key]）
+        });
+        */
+    }
+    static #define(ins, k, v, enumerable=false, writable=false) {
+        Object.defineProperty(ins, `${k}`, {// Protected
+            value: v,
+            enumerable: enumerable, // 鍵列挙可（Object.keys()）
+            writable: writable,     // 値変更禁止（obj[key] = v）
+            configurable: false,    // キー削除禁止（delete obj[key]）
+        });
+    }
+
     /*
     #kvs(textValues) {
         const keyTypes = {}
@@ -230,6 +284,40 @@ class Tuple {
     get _defaults() {return this._obj.map(o=>o.d)}
     get _values() {return this._obj.map(o=>o.v)}
     get _entries() {return this._obj.map(o=>o)}
+    get _arrays() {return this._obj.map(o=>[o.i, o.k, o.t, o.v])}
+    /*
+    next(){
+        console.log('next()')
+        if (this._iterI < this._obj.length) {
+            console.log(this._iterI)
+            const o = this._obj[this._iterI++];
+            return {value:[o.i,o.k,o.t,o.v], done:false}
+        } else {
+            this._iterI = 0;
+            return {value:undefined, done:true}
+        }
+    }
+    */
+    //*[Symbol.iterator]() {for (let o of this._obj) {yield [o.i, o.k, o.t, o.v]}}
+    //*[Symbol.iterator]() {console.log('************');for (let o of this._obj) {yield [o.i, o.k, o.t, o.v]}}
+    //*[Symbol.iterator]() {for (let o of this._obj) {yield [o.i, o.k, o.t, o.v]}}
+    *[Symbol.iterator]() {for (let o of this._obj) {yield o}}
+    /*
+    [Symbol.iterator]() {
+        return {
+            next:()=>{
+                if (this._iterI < this._obj.length) {
+                    console.log(this._iterI)
+                    const o = this._obj[this._iterI++];
+                    return {value:[o.i,o.k,o.t,o.v], done:false}
+                } else {
+                    this._iterI = 0;
+                    return {value:undefined, done:true}
+                }
+            }
+        }
+    }
+    */
 }
 class Splitter {
     static split(text) {

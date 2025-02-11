@@ -247,9 +247,89 @@ window.addEventListener('DOMContentLoaded', (event) => {
     });
     a.t(()=>{
         const t = Tuple.of('x');
+        console.log(t)
+        console.log(Object.keys(t))
         const keys = [...Object.keys(t)]
-        console.log(keys, t)
+        console.log(keys.length, keys, t)
+        for(let key of Object.keys(t)){console.log(key)}
         return 1===keys.length && 'x'===keys[0]
+    })
+    a.t(()=>{
+        const t = Tuple.of('id:I=0 name:s=Yamada age:i=12 isMale:b=v weight:f=65.1');
+        console.log(t)
+        console.log([...t])
+        console.log(t._entries)
+        // ReferenceError: Cannot access 't' before initialization
+        //for (let [i,k,t,v] of t) {
+        //for (let [i,k,t,v] of t._entries) {
+        //for (let x of t._entries) {
+        //for (let [i,k,t,v] of t._arrays) {
+        //for (let [i,k,t,v] of ...t._arrays) {
+        //for (let [i,k,t,v] of t._arrays) {
+        //for (let x of t._arrays) {
+        for (let o of t._entries) {
+            console.log(o)
+                 if (0===o.i) {a.t(0n===o.v && 'id'===o.k)}
+            else if (1===o.i) {a.t('Yamada'===o.v && 'name'===o.k)}
+            else if (2===o.i) {a.t(12===o.v && 'age'===o.k)}
+            else if (3===o.i) {a.t(true===o.v && 'isMale'===o.k)}
+            else if (4===o.i) {a.t(65.1===o.v && 'weight'===o.k)}
+        }
+        for (let o of t._entries) {
+            const {i,k,t,v} = {...o}
+            console.log(o,i,i,t,v)
+                 if (0===i) {a.t(0n===v && 'id'===k)}
+            else if (1===i) {a.t('Yamada'===o.v && 'name'===k)}
+            else if (2===i) {a.t(12===v && 'age'===k)}
+            else if (3===i) {a.t(true===v && 'isMale'===k)}
+            else if (4===i) {a.t(65.1===v && 'weight'===k)}
+        }
+        for (let A of t._arrays) {
+            const [i,k,t,v] = [...A]
+            console.log(A,i,i,t,v)
+                 if (0===i) {a.t(0n===v && 'id'===k)}
+            else if (1===i) {a.t('Yamada'===v && 'name'===k)}
+            else if (2===i) {a.t(12===v && 'age'===k)}
+            else if (3===i) {a.t(true===v && 'isMale'===k)}
+            else if (4===i) {a.t(65.1===v && 'weight'===k)}
+        }
+        /*
+        for (let {i,k,t,v} of {...t._entries}) {
+            console.log(i,i,t,v)
+                 if (0===i) {a.t(0n===v && 'id'===k)}
+            else if (1===i) {a.t('Yamada'===o.v && 'name'===k)}
+            else if (2===i) {a.t(12===v && 'age'===k)}
+            else if (3===i) {a.t(true===v && 'isMale'===k)}
+            else if (4===i) {a.t(65.1===v && 'weight'===k)}
+        }
+        for (let [i,k,t,v] of [...t._array]) {
+            console.log(i,i,t,v)
+                 if (0===i) {a.t(0n===v && 'id'===k)}
+            else if (1===i) {a.t('Yamada'===o.v && 'name'===k)}
+            else if (2===i) {a.t(12===v && 'age'===k)}
+            else if (3===i) {a.t(true===v && 'isMale'===k)}
+            else if (4===i) {a.t(65.1===v && 'weight'===k)}
+        }
+        */
+        /*
+        for (let o of t._entries) {
+            console.log(x)
+                 if (0===i) {a.t(0n===v && 'id'===k)}
+            else if (1===i) {a.t('Yamada'===v && 'name'===k)}
+            else if (2===i) {a.t(12===v && 'age'===k)}
+            else if (3===i) {a.t(true===v && 'isMale'===k)}
+            else if (4===i) {a.t(65.1===v && 'weight'===k)}
+        }
+        */
+        /*
+        console.log(t)
+        console.log(Object.keys(t))
+        const keys = [...Object.keys(t)]
+        console.log(keys.length, keys, t)
+        for(let key of Object.keys(t)){console.log(key)}
+        return 1===keys.length && 'x'===keys[0]
+        */
+        return true
     })
     a.fin();
 });
