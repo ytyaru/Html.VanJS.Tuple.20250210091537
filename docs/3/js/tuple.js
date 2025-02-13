@@ -42,7 +42,10 @@ class Tuple {
             if (!target._mutable){throw new TypeError(`代入禁止です。`)}
             // target._obj
             const iOrK = this.#getKey(key, target._obj.length);
-            const i = target._obj.findIndex(o=>Type.isInt(iOrK) ? o.i===iOrK : o.k===iOrK)
+            const i = target._obj.findIndex(o=>Type.isInt(iOrK) ? o.i===iOrK : o.k===iOrK);
+            const type = target._obj[i].t;
+            console.log(type)
+            if (!type.matchType(value)){throw new TypeError(`値の型が不正です。:${value}:${typeof value}:${type.id}`)}
             if (-1!==i) {target._obj[i].v = value}
             if (key in target) {target[key] = value;}
         },
@@ -81,7 +84,11 @@ class Tuple {
            
            
         for (let i=0; i<ktvs.length; i++) {
-            const type = undefined===ktvs[i].type ? LiteralType.get(ktvs[i].def) : TypeParser.getType(ktvs[i].type, ktvs[i].def)
+            console.log(ktvs[i])
+//            const type = undefined===ktvs[i].type ? LiteralType.get(ktvs[i].def) : TypeParser.getType(ktvs[i].type, ktvs[i].def)
+            //const type = undefined===ktvs[i].type ? LiteralType.get(ktvs[i].def,ktvs[i].def,true) : TypeParser.getType(ktvs[i].type, ktvs[i].def)
+            const type = undefined===ktvs[i].type ? LiteralType.get(ktvs[i].def,ktvs[i].def) : TypeParser.getType(ktvs[i].type, ktvs[i].def)
+            console.log(type)
             const value = (ktvs.length===anyValues.length)
                 ? anyValues[i]
                 : type ? type.deserialize(ktvs[i].def) : ktvs[i].def ?? ''
@@ -149,7 +156,8 @@ class Tuple {
         return typeTxts.map((t,i)=>TypeParser.getType(t,defTxts[i]) ?? this.#getLiteralType(rowTxts[i],defTxts[i]))
     }
 
-    static #getLiteralType(value, defTxts) {console.log(`#getLiteralType: value:${value}, defTxts:${defTxts}`);return (''===value && ''===defTxts) ? new AnyDataType(defTxts[i]) : LiteralType.get(value,defTxts)}
+    //static #getLiteralType(value, defTxt) {console.log(`#getLiteralType: value:${value}, defTxts:${defTxt}`);return (''===value && ''===defTxt) ? new AnyDataType(defTxt) : LiteralType.get(value,defTxt)}
+    static #getLiteralType(value, defTxt) {console.log(`#getLiteralType: value:${value}, defTxts:${defTxt}`);return LiteralType.get(value,defTxt,true)}
     static #defineMember(ins, k, v, isMutable=false) {this.#throwName(k);this.#define(ins, k, v, true, isMutable);}
     static #defineInner(ins, k, v, isMutable=false) {this.#define(ins, k, v, false, isMutable)}
     static #define(ins, k, v, enumerable=false, writable=false) {
@@ -194,7 +202,7 @@ class Splitter {
     }
 }
 class LiteralType {//リテラル値から型を推論する
-    static get(text, defTxt) {
+    static get(text, defTxt, isDefaultAny=false) {
         console.log(`LiteralType.get:`, text, defTxt, /^(-)?\d+n$/.test(text), /^(-)?[0-9]+n$/.test(text), /^(-)?[0-9]+n$/.test('0n'))
              if (/^[_v]+$/.test(text)){return new BooleanDataType(defTxt)}
         else if (/^(-)?(\d+)?\.\d+$/.test(text)){return new FloatDataType(defTxt)}
@@ -208,6 +216,10 @@ class LiteralType {//リテラル値から型を推論する
         else if (/^0B[0-1]+$/.test(text)){return new BigIntDataType(2,defTxt)}
         else if (/^0O[0-7]+$/.test(text)){return new BigIntDataType(8,defTxt)}
         else if (/^0X[0-9a-fA-F]+$/.test(text)){return new BigIntDataType(16,defTxt)}
+        else if ([text,defTxt].every(v=>v===''||Type.isNUN(v))){return new AnyDataType()}
+//        else if ([text,defTxt].every(v=>v===''||Type.isNUN(v))){return isDefaultAny ? new AnyDataType() : new StringDataType()}
+//        else if (''===text || Type.isNUN(text) && ''===defTxt || Type.isNUN(defTxt) ){return isDefaultAny ? new AnyDataType() : new StringDataType()}
+        //else if (''===text && ''===defTxt){return isDefaultAny ? new AnyDataType() : new StringDataType()}
         //else if (''===text && ''===defTxt){return AnyDataType()}
         else {return new StringDataType(defTxt)}
     }
@@ -233,7 +245,7 @@ class TypeParser {
     static getType(typeTxt, defTxt) {// 型名や初期値から型インスタンスを取得する
         if (!DataType.isStr(typeTxt)) {return null}
         // 型名のみ
-        for (let type of [BooleanDataType, FloatDataType, StringDataType]){
+        for (let type of [AnyDataType, BooleanDataType, FloatDataType, StringDataType]){
             if (type.alias.some(t=>t===typeTxt)){return new type(defTxt)}
         }
         for (let type of [IntDataType, BigIntDataType]){
@@ -246,7 +258,7 @@ class TypeParser {
                 return new type(10, defaultValue)
             }
         }
-        for (let type of [BooleanDataType, FloatDataType, StringDataType]){
+        for (let type of [AnyDataType, BooleanDataType, FloatDataType, StringDataType]){
             if (type.alias.some(t=>typeTxt.startsWith(t+'='))){
                 const E = typeTxt.indexOf('=')
                 const defaultValue = typeTxt.slice(-1===E ? typeTxt.length : E+1)
@@ -255,24 +267,33 @@ class TypeParser {
         }
         // 型名＋基数
         for (let type of [IntDataType, BigIntDataType]){
-            if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.some(b=>typeTxt.endsWith(b)))){
-                const base = type.BaseAlias.filter(b=>typeTxt.endsWith(b))[0]
+            //if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.some(b=>typeTxt.endsWith(b)))){
+            //if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.toReversed().some(b=>typeTxt.endsWith(b)))){
+            if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.slice().reverse().some(b=>typeTxt.endsWith(b)))){
+                //const base = type.BaseAlias.filter(b=>typeTxt.endsWith(b))[0]
+                //const base = type.BaseAlias.toReversed().filter(b=>typeTxt.endsWith(b))[0]
+                const base = type.BaseAlias.slice().reverse().filter(b=>typeTxt.endsWith(b))[0]
                 return new type(base)
             }
         }
         // 型名＋基数＝初期値
         for (let type of [IntDataType, BigIntDataType]){
-            if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.some(b=>typeTxt.includes(b+'=')))){
+            //if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.some(b=>typeTxt.includes(b+'=')))){
+            //if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.toReversed().some(b=>typeTxt.includes(b+'=')))){
+            if (type.alias.some(t=>typeTxt.startsWith(t) && type.BaseAlias.slice().reverse().some(b=>typeTxt.includes(b+'=')))){
                 const E = typeTxt.indexOf('=')
                 const keyT = typeTxt.slice(0, E)
                 const valT = typeTxt.slice(E+1)
-                const base = type.BaseAlias.filter(b=>keyT.endsWith(b))[0]
+                //const base = type.BaseAlias.filter(b=>keyT.endsWith(b))[0]
+                //const base = type.BaseAlias.toReversed().filter(b=>keyT.endsWith(b))[0]
+                const base = type.BaseAlias.slice().reverse().filter(b=>keyT.endsWith(b))[0]
                 return new type(base, valT)
             }
         }
     }
     static read(typeTxt, defValTxt, textValues) {
-        if (['s','str','string'].some(t=>t===typeTxt)) {return  new StringDataType(defValTxt)}
+             if (['any'].some(t=>t===typeTxt)) {return new AnyDataType(defValTxt)}
+        else if (['s','str','string'].some(t=>t===typeTxt)) {return  new StringDataType(defValTxt)}
         else if ('i|int|integer'.split('|').some(t=>typeTxt?.startsWith(t))){
             const base = IntDataType.BaseAlias.some(b=>typeTxt.endsWith(b))
                 ? IntDataType.BaseAlias.filter(b=>typeTxt.endsWith(b)).map(b=>b)[0]
@@ -328,6 +349,7 @@ class DataType {
         if (this._isNUN(text)){text=''}
         return ''===text ? this.defaultValue : text
     }
+    matchType(value) {return false}
     _isNUN(v) {return null===v || undefined===v || Number.isNaN(v)}
     _isStr(v) {return typeof v === 'string' || v instanceof String;}
     _isInt(v) {return Number.isInteger(v)}
@@ -342,6 +364,7 @@ class DataType {
 class AnyDataType extends DataType {
     constructor(defVal='') { super('any', defVal ?? '') }
     static get alias() {return 'any'.split('|')}
+    matchType(value) {return true}
 }
 class StringDataType extends DataType {
     constructor(defVal='') { super('string', defVal ?? '') }
@@ -349,6 +372,7 @@ class StringDataType extends DataType {
     static get alias() {return 's|str|string'.split('|')}
     //deserialize(text) {return super.deserialize(text).replace(/\\n/g,'\n').replace(/\\t/g,'\t')}
     deserialize(text) {return ''===text ? this.defaultValue : super.deserialize(text).replace(/\\n/g,'\n').replace(/\\t/g,'\t')}
+    matchType(v) {return Type.isStr(v)}
 }
 class FloatDataType extends DataType {
     constructor(defVal=0) {
@@ -361,6 +385,7 @@ class FloatDataType extends DataType {
         if (Number.isNaN(v)) {throw new TypeError(`Float型への変換に失敗しました。:${text}:${v}`)}
         return v
     }
+    matchType(v) {return Type.isFloat(v) || Type.isInt(v)} // 小数点以下が0の場合はInt判定になるがそれも許容する
     // NaNは禁止
     // -1e5 のような指数表記を認めるべきか
     // Infinity のような無限数を認めるべきか
@@ -378,13 +403,14 @@ class BooleanDataType extends DataType {
         else if ('v'===v) {return true}
         else {throw new TypeError(`Boolean型への変換に失敗しました。Boolean型の値は_,v,空文字のいずれかで表現されます。:${text}:${v}`)}
     }
+    matchType(v) {return Type.isBool(v)}
 }
 class IntDataType extends DataType {
     static BaseAlias = 'H|2|8|10|12|16|24|32|36'.split('|');
     constructor(base=10, defVal=0) {
         super('integer', defVal ?? 0);
         this._base = this.#base(base);
-        this._basePrefix = {b:2, o:8, x:16, v:32, z:36}
+        this._basePrefix = {b:2, o:8, d:10, x:16, v:32, z:36}
     }
     #base(base) {
         if ('H'===base){base=16}
@@ -395,7 +421,7 @@ class IntDataType extends DataType {
     }
     get base() {return this._base}
     static get alias() {return 'i|int|integer'.split('|')}
-    get baseAlias() {return 'H|2|8|12|16|24|32|36'.split('|')}
+    get baseAlias() {return 'H|2|8|10|12|16|24|32|36'.split('|')}
     get baseValues() {return this.basePrefixs.map(k=>this._basePrefix[k])}
     get basePrefixs() {return Object.getOwnPropertyNames(this._basePrefix)}
     get basePrefix() {
@@ -412,6 +438,7 @@ class IntDataType extends DataType {
         return v
     }
     #delPrefix(d){return (this._isStr(d) && ''!==this.basePrefix && d.startsWith(`0${this.basePrefix}`)) ? d.slice(2) : d}
+    matchType(v) {return Type.isInt(v)}
 }
 class BigIntDataType extends DataType {
     static BaseAlias = 'H|2|8|10|16'.split('|');
@@ -446,6 +473,7 @@ class BigIntDataType extends DataType {
         catch(err){throw new TypeError(`BigInt型への変換に失敗しました。:${text}`)}
         
     } // BigInt('x') SyntaxError: Cannot convert x to a BigInt
+    matchType(v) {return Type.isBigInt(v)}
 }
 class RegExpDataType extends DataType {
     constructor(defVal=null) {
@@ -462,6 +490,7 @@ class RegExpDataType extends DataType {
         if (d instanceof RegExp){return d}
         return new RegExp(type.pattern, type.option)
     }
+    matchType(v) {return Type.isIns(v, RegExp)}
 }
 class RangeDataType extends DataType {
     constructor(defVal=0, min=0, max=100) {

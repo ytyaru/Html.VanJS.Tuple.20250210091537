@@ -528,11 +528,42 @@ Y`, new URL('https://www.google.co.jp/'));
 Y`, new URL('https://www.google.co.jp/'));
         return t instanceof Tuple && 1===t._size && t._has('url') && t.url instanceof URL && 'https://www.google.co.jp/'===t.url.href
     })
-    a.t(()=>{
+    // Tuple.mut()で値の代入確認する
+    a.t(()=>{// any型は何でも代入できる
         const t = Tuple.mut(`url`, new URL('https://www.google.co.jp/'));
         t.url = new URL('https://www.yahoo.co.jp/')
         return t instanceof Tuple && 1===t._size && t._has('url') && t.url instanceof URL && 'https://www.yahoo.co.jp/'===t.url.href
     })
+    a.t(()=>{
+        const t = Tuple.mut(`url:any`, new URL('https://www.google.co.jp/'));
+        t.url = new URL('https://www.yahoo.co.jp/')
+        return t instanceof Tuple && 1===t._size && t._has('url') && t.url instanceof URL && 'https://www.yahoo.co.jp/'===t.url.href
+    })
+    a.e(TypeError, `値の型が不正です。:1:number:string`, ()=>{
+        const t = Tuple.mut(`name:s=A`);
+        t.name = 1;
+    })
+    a.e(TypeError, `値の型が不正です。:x:string:integer`, ()=>{
+        const t = Tuple.mut(`age:i=0`);
+        t.age= 'x';
+    })
+    // Tuple.of()で初期値代入における型エラー確認（String型はエラーが起きない）
+    a.e(TypeError, `Boolean型への変換に失敗しました。Boolean型の値は_,v,空文字のいずれかで表現されます。:true:true`, ()=>Tuple.of('name:b=true'));
+    a.e(TypeError, `Float型への変換に失敗しました。:x:NaN`, ()=>Tuple.of('name:f=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:10:`, ()=>Tuple.of('name:i=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:2:b`, ()=>Tuple.of('name:i2=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:8:o`, ()=>Tuple.of('name:i8=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:10:`, ()=>Tuple.of('name:i10=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:16:x`, ()=>Tuple.of('name:iH=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:16:x`, ()=>Tuple.of('name:i16=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:x:NaN:32:v`, ()=>Tuple.of('name:i32=x'));
+    a.e(TypeError, `Int型への変換に失敗しました。:_:NaN:36:z`, ()=>Tuple.of('name:i36=_'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:x`, ()=>Tuple.of('name:I=x'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:0Bx`, ()=>Tuple.of('name:I2=x'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:0Ox`, ()=>Tuple.of('name:I8=x'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:x`, ()=>Tuple.of('name:I10=x'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:0Xx`, ()=>Tuple.of('name:IH=x'));
+    a.e(TypeError, `BigInt型への変換に失敗しました。:0Xx`, ()=>Tuple.of('name:I16=x'));
     a.fin();
 });
 window.addEventListener('beforeunload', (event) => {
